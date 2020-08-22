@@ -1,7 +1,10 @@
 import bcrypt from 'bcrypt'
-import nodemailer from 'nodemailer'
 
-import {UnauthorizedError, NotFoundError} from '../../utils/error'
+import {
+  UnauthorizedError,
+  NotFoundError,
+  ForbiddenError
+} from '../../utils/error'
 import {
   createAccessToken,
   createRefreshToken,
@@ -10,16 +13,14 @@ import {
   getToken,
   saveToken,
   invalidateToken,
+  sendEmail
 } from './utils'
-import UserInstance from './services'
+import User from './services'
 import tokenConfig from './config'
-
-const User = new UserInstance()
 
 async function login(req, res) {
   const {username, password} = req.body
   const userData = await User.getUserByUsername(username)
-
   if (!userData) {
     throw new NotFoundError(
       `Tidak ditemukan pengguna dengan username ${username}`
@@ -28,8 +29,6 @@ async function login(req, res) {
     throw new UnauthorizedError(
       'Password yang dimasukan tidak cocok cocok dengan username'
     )
-  } else if (!userData.users.isVerified) {
-    throw new UnauthorizedError('Lakukan verifikasi akun terlebih dahulu')
   } else {
     const accessToken = createAccessToken(userData.users.id)
     const refreshToken = createRefreshToken(userData.users.id)
@@ -37,30 +36,60 @@ async function login(req, res) {
     res
       .cookie('accessToken', accessToken, {
         maxAge: tokenConfig.accessTokenExpires,
-        httpOnly: true,
+        httpOnly: true
       })
       .cookie('refreshToken', refreshToken, {
         maxAge: tokenConfig.refreshTokenExpires,
-        httpOnly: true,
+        httpOnly: true
       })
       .json({
         status: 'success',
-        user: {
-          id: userData.users.id,
-        },
+        userData: {
+          user: userData.users,
+          store: userData.stores
+        }
       })
   }
 }
 
-function signup(req, res) {
-  console.log('signup')
+async function signup(req, res) {
+  let {username, email, password} = req.body
+  const isUsernameExist = await User.getUserByUsername(username)
+  if (isUsernameExist) {
+    throw new ForbiddenError({
+      type: 'username',
+      message: 'Username tidak tersedia'
+    })
+  }
+
+  const isEmailExist = await User.getUserByEmail(email)
+  if (isEmailExist) {
+    throw new ForbiddenError({
+      type: 'email',
+      message: 'Sudah ada yang menggunakan email ini'
+    })
+  }
+  password = bcrypt.hashSync(password, 10)
+
+  await User.register({
+    email,
+    username,
+    password
+  })
+
+  res.json({
+    code: 200,
+    status: 'success',
+    message: 'regitration success'
+  })
 }
 
 async function logout(req, res) {
   await invalidateToken(req.cookies['refreshToken'])
   res.clearCookie('accessToken').clearCookie('refreshToken').json({
+    code: 200,
     status: 'success',
-    message: 'logout success',
+    message: 'logout success'
   })
 }
 
@@ -69,51 +98,66 @@ async function user(req, res) {
   if (!accessToken) {
     let refreshToken = validateRefreshToken(req.cookies['refreshToken'])
     if (!refreshToken) {
-      throw new UnauthorizedError('Login terlebih dahulu')
+      return res.json({
+        code: 401,
+        status: 'unauthenticated',
+        userData: null
+      })
     }
     await invalidateToken(req.cookies['refreshToken'])
-    accessToken = createAccessToken(refreshToken.user.idUser)
-    refreshToken = createRefreshToken(refreshToken.user.idUser)
+    const userData = await User.getUserByID(refreshToken.user.id)
+    accessToken = createAccessToken(userData.users.id)
+    refreshToken = createRefreshToken(userData.users.id)
     await saveToken(refreshToken)
-    res
+    return res
       .cookie('accessToken', accessToken, {
         maxAge: tokenConfig.accessTokenExpires,
-        httpOnly: true,
+        httpOnly: true
       })
       .cookie('refreshToken', refreshToken, {
         maxAge: tokenConfig.refreshTokenExpires,
-        httpOnly: true,
+        httpOnly: true
       })
       .json({
+        code: 200,
         status: 'success',
-        user: req.user,
+        userData: {
+          user: userData.users,
+          store: userData.stores
+        }
       })
-  } else {
-    res.json({
-      status: 'success',
-      user: accessToken.user,
-    })
   }
+
+  const userData = await User.getUserByID(accessToken.user.id)
+  res.json({
+    code: 200,
+    status: 'success',
+    userData: {
+      user: userData.users,
+      store: userData.stores
+    }
+  })
 }
 
 async function resetPassword(req, res) {
-  const {token, newPassword} = req.body
+  let {token, newPassword} = req.body
   const accessToken = validateAccessToken(token)
   if (!accessToken) {
     throw new UnauthorizedError('Gagal mereset password, token tidak valid')
   }
   const dbToken = await getToken(token)
-  console.log('1st log')
+
   if (!dbToken.isValid) {
     throw new UnauthorizedError('Gagal mereset password, token tidak valid')
   }
-  console.log('2nd log')
+
+  newPassword = bcrypt.hashSync(newPassword, 10)
   await User.changePassword(accessToken.user.id, newPassword)
   await invalidateToken(token)
   res.json({
     code: 200,
     status: 'success',
-    message: 'berhasil mereset password',
+    message: 'berhasil mereset password'
   })
 }
 
@@ -131,7 +175,7 @@ async function resetPasswordConfirmation(req, res) {
   res.json({
     code: 200,
     status: 'success',
-    message: 'URL valid',
+    message: 'URL valid'
   })
 }
 
@@ -141,24 +185,52 @@ async function resetPasswordRequest(req, res) {
     throw new NotFoundError('Tidak ditemukan pengguna dengan email ini')
   }
 
-  const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.EMAIL_EMAIL,
-      pass: process.env.EMAIL_PASSWORD,
-    },
-  })
-
   const token = createAccessToken(userData.id)
   await saveToken(token)
-  await transporter.sendMail({
-    from: '"ewarung" <no-reply@ewarung.com>',
+  await sendEmail({
     to: req.body.email,
     subject: 'Reset password request',
-    text: `halo, klik tautan berikut untuk melanjutkan reset password akun anda ${req.headers.origin}/resetPassword/changePassword/${token}. url berlaku selama 30 menit`,
+    message: `halo, klik tautan berikut untuk melanjutkan reset password akun anda ${req.headers.origin}/resetPassword/changePassword/${token}. url berlaku selama 30 menit`
   })
 
   res.json({status: 'success', message: 'success sending email'})
+}
+
+async function verificationRequest(req, res) {
+  const {username} = req.body
+  const userData = await User.getUserByUsername(username)
+  const token = createAccessToken(userData.users.id)
+  await saveToken(token)
+  await sendEmail({
+    to: userData.users.email,
+    subject: 'Verifikasi akun',
+    message: `Klik pada tautan berikut untuk menverifikasi akun ${req.headers.origin}/accountVerification/confirmation/${token}. tautan verifikasi berlaku selama 30 menit`
+  })
+  res.json({
+    code: 200,
+    status: 'success',
+    message: 'berhasil mengirim email verifikasi'
+  })
+}
+
+async function verifyAccount(req, res) {
+  const {token} = req.body
+  const accessToken = validateAccessToken(token)
+  if (!accessToken) {
+    throw new NotFoundError('Token tidak valid')
+  }
+  const dbToken = await getToken(token)
+  if (!dbToken.isValid) {
+    throw new NotFoundError('Token tidak valid')
+  }
+  await User.verifyAccount(accessToken.user.id)
+  await invalidateToken(token)
+
+  res.json({
+    code: 200,
+    status: 'success',
+    message: 'verification account success'
+  })
 }
 
 export {
@@ -169,4 +241,6 @@ export {
   resetPassword,
   resetPasswordRequest,
   resetPasswordConfirmation,
+  verificationRequest,
+  verifyAccount
 }

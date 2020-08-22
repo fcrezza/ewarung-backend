@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken'
+import nodemailer from 'nodemailer'
 
 import tokenConfig from './config'
 import query from '../../store'
@@ -7,12 +8,12 @@ function createAccessToken(idUser) {
   return jwt.sign(
     {
       user: {
-        id: idUser,
-      },
+        id: idUser
+      }
     },
     process.env.ACCESS_TOKEN_SECRET,
     {
-      expiresIn: tokenConfig.accessTokenExpires.toString(),
+      expiresIn: tokenConfig.accessTokenExpires.toString()
     }
   )
 }
@@ -21,12 +22,12 @@ function createRefreshToken(idUser) {
   return jwt.sign(
     {
       user: {
-        id: idUser,
-      },
+        id: idUser
+      }
     },
     process.env.REFRESH_TOKEN_SECRET,
     {
-      expiresIn: tokenConfig.refreshTokenExpires.toString(),
+      expiresIn: tokenConfig.refreshTokenExpires.toString()
     }
   )
 }
@@ -60,6 +61,24 @@ async function getToken(token) {
   return tokens[0]
 }
 
+async function sendEmail(emailData) {
+  const {to, subject, message} = emailData
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.EMAIL_EMAIL,
+      pass: process.env.EMAIL_PASSWORD
+    }
+  })
+
+  await transporter.sendMail({
+    from: '"ewarung" <no-reply@ewarung.com>',
+    to,
+    subject,
+    text: message
+  })
+}
+
 export {
   createAccessToken,
   createRefreshToken,
@@ -68,4 +87,5 @@ export {
   getToken,
   saveToken,
   invalidateToken,
+  sendEmail
 }

@@ -7,7 +7,7 @@ const pool = mysql.createPool(config)
 async function query(statement, placeholder) {
   try {
     const connection = await pool.getConnection()
-    if (placeholder.length) {
+    if (placeholder) {
       const [rows] = await connection.query(statement, placeholder)
       connection.release()
       return rows

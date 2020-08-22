@@ -4,10 +4,21 @@ class User {
   async getUserByUsername(username) {
     const options = {
       sql:
-        'select users.*, passwords.* from users left join passwords on users.id = passwords.idUser where users.username = ?',
-      nestTables: true,
+        'select users.*, passwords.*, stores.* from users left join passwords on users.id = passwords.idUser left join stores on users.id = stores.idUser where users.username = ?',
+      nestTables: true
     }
     const results = await query(options, username)
+
+    return results[0]
+  }
+
+  async getUserByID(id) {
+    const options = {
+      sql:
+        'select users.*, passwords.*, stores.* from users left join passwords on users.id = passwords.idUser left join stores on users.id = stores.idUser where users.id = ?',
+      nestTables: true
+    }
+    const results = await query(options, id)
 
     return results[0]
   }
@@ -20,9 +31,26 @@ class User {
   async changePassword(idUser, password) {
     await query('update passwords set password = ? where idUser = ?', [
       password,
-      idUser,
+      idUser
     ])
+  }
+
+  async register(data) {
+    const {email, username, password} = data
+
+    const user = await query(
+      'insert into users (username, email) values (?, ?)',
+      [username, email]
+    )
+    await query('insert into passwords (password, idUser) values (?, ?)', [
+      password,
+      user.insertId
+    ])
+  }
+
+  async verifyAccount(id) {
+    await query('update users set isVerified = 1 where id = ?', id)
   }
 }
 
-export default User
+export default new User()
