@@ -1,33 +1,34 @@
 import jwt from 'jsonwebtoken'
 import nodemailer from 'nodemailer'
+import config from 'config'
 
-import tokenConfig from './config'
 import query from '../../store'
 
-function createAccessToken(idUser) {
+const {accessTokenExpires, refreshTokenExpires} = config.get('token')
+function createAccessToken(id) {
   return jwt.sign(
     {
       user: {
-        id: idUser
+        id
       }
     },
     process.env.ACCESS_TOKEN_SECRET,
     {
-      expiresIn: tokenConfig.accessTokenExpires.toString()
+      expiresIn: accessTokenExpires.toString()
     }
   )
 }
 
-function createRefreshToken(idUser) {
+function createRefreshToken(id) {
   return jwt.sign(
     {
       user: {
-        id: idUser
+        id
       }
     },
     process.env.REFRESH_TOKEN_SECRET,
     {
-      expiresIn: tokenConfig.refreshTokenExpires.toString()
+      expiresIn: refreshTokenExpires.toString()
     }
   )
 }

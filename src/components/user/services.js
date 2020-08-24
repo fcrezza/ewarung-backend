@@ -8,7 +8,6 @@ class User {
       nestTables: true
     }
     const results = await query(options, username)
-
     return results[0]
   }
 
@@ -19,7 +18,6 @@ class User {
       nestTables: true
     }
     const results = await query(options, id)
-
     return results[0]
   }
 
@@ -37,7 +35,6 @@ class User {
 
   async register(data) {
     const {email, username, password} = data
-
     const user = await query(
       'insert into users (username, email) values (?, ?)',
       [username, email]
@@ -53,4 +50,6 @@ class User {
   }
 }
 
-export default new User()
+const userInstance = new User()
+
+export default userInstance

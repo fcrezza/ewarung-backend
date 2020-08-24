@@ -30,4 +30,10 @@ class UnauthorizedError extends GeneralError {}
 class ForbiddenError extends GeneralError {}
 class NotFoundError extends GeneralError {}
 
-export {GeneralError, UnauthorizedError, ForbiddenError, NotFoundError}
+export {
+  GeneralError,
+  UnauthorizedError,
+  ForbiddenError,
+  NotFoundError,
+  BadRequestError
+}

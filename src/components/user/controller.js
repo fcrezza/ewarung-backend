@@ -1,5 +1,7 @@
 import bcrypt from 'bcrypt'
+import config from 'config'
 
+import User from './services'
 import {
   UnauthorizedError,
   NotFoundError,
@@ -15,8 +17,8 @@ import {
   invalidateToken,
   sendEmail
 } from './utils'
-import User from './services'
-import tokenConfig from './config'
+
+const {accessTokenExpires, refreshTokenExpires} = config.get('token')
 
 async function login(req, res) {
   const {username, password} = req.body
@@ -35,11 +37,11 @@ async function login(req, res) {
     await saveToken(refreshToken)
     res
       .cookie('accessToken', accessToken, {
-        maxAge: tokenConfig.accessTokenExpires,
+        maxAge: accessTokenExpires,
         httpOnly: true
       })
       .cookie('refreshToken', refreshToken, {
-        maxAge: tokenConfig.refreshTokenExpires,
+        maxAge: refreshTokenExpires,
         httpOnly: true
       })
       .json({
@@ -57,7 +59,7 @@ async function signup(req, res) {
   const isUsernameExist = await User.getUserByUsername(username)
   if (isUsernameExist) {
     throw new ForbiddenError({
-      type: 'username',
+      name: 'username',
       message: 'Username tidak tersedia'
     })
   }
@@ -65,7 +67,7 @@ async function signup(req, res) {
   const isEmailExist = await User.getUserByEmail(email)
   if (isEmailExist) {
     throw new ForbiddenError({
-      type: 'email',
+      name: 'email',
       message: 'Sudah ada yang menggunakan email ini'
     })
   }
@@ -111,11 +113,11 @@ async function user(req, res) {
     await saveToken(refreshToken)
     return res
       .cookie('accessToken', accessToken, {
-        maxAge: tokenConfig.accessTokenExpires,
+        maxAge: accessTokenExpires,
         httpOnly: true
       })
       .cookie('refreshToken', refreshToken, {
-        maxAge: tokenConfig.refreshTokenExpires,
+        maxAge: refreshTokenExpires,
         httpOnly: true
       })
       .json({
