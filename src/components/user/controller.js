@@ -1,28 +1,34 @@
 import bcrypt from 'bcrypt'
 import config from 'config'
 
-import User from './services'
 import {
   UnauthorizedError,
   NotFoundError,
   ForbiddenError
-} from '../../utils/error'
+} from '../../shared/error'
 import {
-  createAccessToken,
-  createRefreshToken,
-  validateAccessToken,
-  validateRefreshToken,
-  getToken,
   saveToken,
   invalidateToken,
-  sendEmail
+  createAccessToken,
+  createRefreshToken,
+  validateAccessToken
+} from '../../shared/token'
+import {
+  getToken,
+  sendEmail,
+  getUserByUsername,
+  getUserByID,
+  getUserByEmail,
+  changePassword,
+  register,
+  verifyAccount
 } from './utils'
 
 const {accessTokenExpires, refreshTokenExpires} = config.get('token')
 
 async function login(req, res) {
   const {username, password} = req.body
-  const userData = await User.getUserByUsername(username)
+  const userData = await getUserByUsername(username)
   if (!userData) {
     throw new NotFoundError(
       `Tidak ditemukan pengguna dengan username ${username}`
@@ -56,7 +62,7 @@ async function login(req, res) {
 
 async function signup(req, res) {
   let {username, email, password} = req.body
-  const isUsernameExist = await User.getUserByUsername(username)
+  const isUsernameExist = await getUserByUsername(username)
   if (isUsernameExist) {
     throw new ForbiddenError({
       name: 'username',
@@ -64,7 +70,7 @@ async function signup(req, res) {
     })
   }
 
-  const isEmailExist = await User.getUserByEmail(email)
+  const isEmailExist = await getUserByEmail(email)
   if (isEmailExist) {
     throw new ForbiddenError({
       name: 'email',
@@ -73,7 +79,7 @@ async function signup(req, res) {
   }
   password = bcrypt.hashSync(password, 10)
 
-  await User.register({
+  await register({
     email,
     username,
     password
@@ -96,41 +102,7 @@ async function logout(req, res) {
 }
 
 async function user(req, res) {
-  let accessToken = validateAccessToken(req.cookies['accessToken'])
-  if (!accessToken) {
-    let refreshToken = validateRefreshToken(req.cookies['refreshToken'])
-    if (!refreshToken) {
-      return res.json({
-        code: 401,
-        status: 'unauthenticated',
-        userData: null
-      })
-    }
-    await invalidateToken(req.cookies['refreshToken'])
-    const userData = await User.getUserByID(refreshToken.user.id)
-    accessToken = createAccessToken(userData.users.id)
-    refreshToken = createRefreshToken(userData.users.id)
-    await saveToken(refreshToken)
-    return res
-      .cookie('accessToken', accessToken, {
-        maxAge: accessTokenExpires,
-        httpOnly: true
-      })
-      .cookie('refreshToken', refreshToken, {
-        maxAge: refreshTokenExpires,
-        httpOnly: true
-      })
-      .json({
-        code: 200,
-        status: 'success',
-        userData: {
-          user: userData.users,
-          store: userData.stores
-        }
-      })
-  }
-
-  const userData = await User.getUserByID(accessToken.user.id)
+  const userData = await getUserByID(req.user.id)
   res.json({
     code: 200,
     status: 'success',
@@ -154,7 +126,7 @@ async function resetPassword(req, res) {
   }
 
   newPassword = bcrypt.hashSync(newPassword, 10)
-  await User.changePassword(accessToken.user.id, newPassword)
+  await changePassword(accessToken.user.id, newPassword)
   await invalidateToken(token)
   res.json({
     code: 200,
@@ -182,7 +154,7 @@ async function resetPasswordConfirmation(req, res) {
 }
 
 async function resetPasswordRequest(req, res) {
-  const userData = await User.getUserByEmail(req.body.email)
+  const userData = await getUserByEmail(req.body.email)
   if (!userData) {
     throw new NotFoundError('Tidak ditemukan pengguna dengan email ini')
   }
@@ -200,7 +172,7 @@ async function resetPasswordRequest(req, res) {
 
 async function verificationRequest(req, res) {
   const {username} = req.body
-  const userData = await User.getUserByUsername(username)
+  const userData = await getUserByUsername(username)
   const token = createAccessToken(userData.users.id)
   await saveToken(token)
   await sendEmail({
@@ -215,7 +187,7 @@ async function verificationRequest(req, res) {
   })
 }
 
-async function verifyAccount(req, res) {
+async function accountVerification(req, res) {
   const {token} = req.body
   const accessToken = validateAccessToken(token)
   if (!accessToken) {
@@ -225,7 +197,7 @@ async function verifyAccount(req, res) {
   if (!dbToken.isValid) {
     throw new NotFoundError('Token tidak valid')
   }
-  await User.verifyAccount(accessToken.user.id)
+  await verifyAccount(accessToken.user.id)
   await invalidateToken(token)
 
   res.json({
@@ -244,5 +216,5 @@ export {
   resetPasswordRequest,
   resetPasswordConfirmation,
   verificationRequest,
-  verifyAccount
+  accountVerification
 }

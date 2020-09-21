@@ -9,10 +9,9 @@ import {
   resetPasswordRequest,
   resetPasswordConfirmation,
   verificationRequest,
-  verifyAccount
+  accountVerification
 } from './controller'
 import {
-  validate,
   loginValidation,
   signupValidation,
   logoutValidation,
@@ -22,10 +21,12 @@ import {
   verifyAccountReqValidation,
   verifyAccountValidation
 } from './validation'
+import {validateUser} from '../../shared/user'
+import validate from '../../shared/validateInput'
 
 const router = Router()
 
-router.get('/', user)
+router.get('/', validateUser, user)
 router.post('/login', validate(loginValidation), login)
 router.post('/signup', validate(signupValidation), signup)
 router.get('/logout', validate(logoutValidation), logout)
@@ -37,7 +38,7 @@ router.post(
 router.post(
   '/accountVerification/confirmation',
   validate(verifyAccountValidation),
-  verifyAccount
+  accountVerification
 )
 router.post('/resetPassword', validate(resetPasswordValidation), resetPassword)
 router.post(

@@ -2,7 +2,7 @@ import mysql from 'mysql2/promise'
 import config from 'config'
 
 const dbConfig = config.get('database')
-const pool = mysql.createPool(dbConfig)
+export const pool = mysql.createPool(dbConfig)
 
 async function query(statement, placeholder) {
   const connection = await pool.getConnection()

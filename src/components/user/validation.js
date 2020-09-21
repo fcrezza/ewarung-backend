@@ -1,24 +1,6 @@
-import {body, cookie, param, validationResult} from 'express-validator'
-import {BadRequestError} from '../../utils/error'
+import {body, cookie, param} from 'express-validator'
 
-const customValidationResult = validationResult.withDefaults({
-  formatter: (error) => ({name: error.param, message: error.msg})
-})
-
-const validate = (validations) => {
-  return async (req, res, next) => {
-    await Promise.all(validations.map((validation) => validation.run(req)))
-
-    const errors = customValidationResult(req)
-    if (errors.isEmpty()) {
-      return next()
-    }
-
-    throw new BadRequestError(errors.array())
-  }
-}
-
-const loginValidation = [
+export const loginValidation = [
   body('username').notEmpty().withMessage('username tidak boleh kosong'),
   body('password')
     .notEmpty()
@@ -28,7 +10,7 @@ const loginValidation = [
     .withMessage('password minimal mengandung 8 karakter')
 ]
 
-const signupValidation = [
+export const signupValidation = [
   body('username').notEmpty().withMessage('username tidak boleh kosong'),
   body('email').normalizeEmail().isEmail().withMessage('Email tidak valid'),
   body('password')
@@ -40,11 +22,11 @@ const signupValidation = [
     .withMessage('password minimal mengandung 8 karakter')
 ]
 
-const logoutValidation = [
+export const logoutValidation = [
   cookie('refreshToken').notEmpty().withMessage('invalid refreshToken')
 ]
 
-const resetPasswordValidation = [
+export const resetPasswordValidation = [
   body('token').notEmpty().withMessage('invalid token'),
   body('newPassword')
     .notEmpty()
@@ -55,29 +37,17 @@ const resetPasswordValidation = [
     .withMessage('password minimal mengandung 8 karakter')
 ]
 
-const resetPassConfirmValidation = [
+export const resetPassConfirmValidation = [
   param('token').notEmpty().withMessage('invalid token')
 ]
 
-const resetPassReqValidation = [
+export const resetPassReqValidation = [
   body('email').normalizeEmail().isEmail().withMessage('Email tidak valid')
 ]
 
-const verifyAccountValidation = [
-  body('username').notEmpty().withMessage('username tidak boleh kosong')
-]
-const verifyAccountReqValidation = [
+export const verifyAccountValidation = [
   body('token').notEmpty().withMessage('invalid token')
 ]
-
-export {
-  validate,
-  loginValidation,
-  signupValidation,
-  logoutValidation,
-  resetPasswordValidation,
-  resetPassReqValidation,
-  resetPassConfirmValidation,
-  verifyAccountValidation,
-  verifyAccountReqValidation
-}
+export const verifyAccountReqValidation = [
+  body('username').notEmpty().withMessage('username tidak boleh kosong')
+]
