@@ -1,7 +1,6 @@
 import query, {pool} from '../../store'
 
 export async function getInventories({q, minStock, idStore}) {
-  console.log(1, minStock, idStore)
   return await query(
     'select id, name, price, stock from inventories where idStore = ? and name like ? and stock >= ?',
     [idStore, q, minStock]
@@ -79,7 +78,7 @@ export async function dbGetStore(idStore) {
 
 export async function dbGetTotalInvoice(idStore) {
   const [invoice] = await query(
-    'select count(*) as total_invoice from invoices where id_store = ?',
+    'select max(id) as id from invoices where idStore = ?',
     idStore
   )
   return invoice
@@ -94,8 +93,9 @@ export async function dbCreateInvoice(idStore, data) {
       cash,
       cashback,
       invoice,
-      id_store: idStore,
-      total_price: totalPrice
+      totalItem: items.reduce((acc, item) => (acc += item.quantity), 0),
+      idStore: idStore,
+      totalPrice: totalPrice
     })
     await connection.query(
       'insert into transactions (idGoods, quantity, totalPrice, idInvoice) value ? ',
@@ -121,4 +121,41 @@ export async function dbCreateInvoice(idStore, data) {
   } finally {
     await connection.release()
   }
+}
+
+export async function dbGetTransactions({
+  idStore,
+  sort,
+  order,
+  startDate,
+  endDate,
+  page,
+  limit
+}) {
+  const orderBy = {
+    toSqlString: () => `${sort} ${order}`
+  }
+
+  const [
+    totalRecords
+  ] = await query(
+    'select count(id) as total from invoices where idStore = ? and date(timestamp) between ? and ?',
+    [idStore, startDate, endDate]
+  )
+  const data = await query(
+    `select * from invoices where idStore = ? and date(timestamp) between ? and ? order by ? limit ? offset ?`,
+    [idStore, startDate, endDate, orderBy, limit, page]
+  )
+
+  return {
+    data,
+    ...totalRecords
+  }
+}
+
+export async function dbDeleteTransactions(idStore, data) {
+  await query('delete from invoices where idStore = ? and id in (?)', [
+    idStore,
+    data
+  ])
 }

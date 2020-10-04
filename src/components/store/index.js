@@ -9,7 +9,9 @@ import {
   oftenSupply,
   rarelySupply,
   getTransactionData,
-  processTransaction
+  processTransaction,
+  transactions,
+  deleteTransactions
 } from './controllers'
 import {suppliersValidation} from './validation'
 import {validateUser} from '../../shared/user'
@@ -18,6 +20,8 @@ import validate from '../../shared/validateInput'
 const router = Router()
 
 router.get('/:idStore/inventories/', validateUser, inventories)
+router.get('/:idStore/transactions', validateUser, transactions)
+router.post('/:idStore/transactions/delete', validateUser, deleteTransactions)
 router.get('/:idStore/transaction/', validateUser, getTransactionData)
 router.post('/:idStore/transaction/', validateUser, processTransaction)
 router.get('/:idStore/suppliers', validateUser, suppliers)
